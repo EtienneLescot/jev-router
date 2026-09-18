@@ -51,14 +51,6 @@ header p b{color:var(--ink);font-weight:600}
 .top .brand{margin:0}
 .src{color:var(--mut);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:5px 11px}
 .src:hover{color:var(--ink);border-color:var(--line2)}
-.keyrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
-.keyrow label{font-size:12px;color:var(--mut);font-weight:600}
-.keyrow input{flex:1;min-width:220px;background:var(--well);border:1px solid var(--line);border-radius:10px;color:var(--ink);
-  font:13px var(--mono);padding:8px 12px}
-.keyrow input:focus{outline:none;border-color:var(--a1);box-shadow:0 0 0 3px rgba(79,140,255,.18)}
-.keyrow .opt{color:var(--dim);font-weight:400}
-.keyrow small{font-size:11.5px;color:var(--dim)}
-.keyrow a{color:var(--a2)}
 textarea{width:100%;min-height:70px;resize:vertical;background:var(--well);border:1px solid var(--line);border-radius:13px;
   color:var(--ink);font:inherit;padding:12px 14px;margin-top:12px;transition:border-color .15s}
 textarea:focus{outline:none;border-color:var(--a1);box-shadow:0 0 0 3px rgba(79,140,255,.18)}
@@ -248,11 +240,6 @@ footer a{color:var(--mut)}
 
   <section class="panel input">
     <div class="ph"><h2>Inbound customer message</h2></div>
-    <div class="keyrow">
-      <label for="key">Your own API key <span class="opt">(optional)</span></label>
-      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Leave empty to use the demo key">
-      <small>Kept in this tab only. <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Get a key</a></small>
-    </div>
     <textarea id="msg" maxlength="1000" aria-label="Customer message" placeholder="Type a customer message, or pick an example below…"></textarea>
     <div class="controls">
       <div class="presets">
@@ -339,21 +326,14 @@ const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* The Jev API refuses browser calls from other origins (CORS), so requests go through
-   a stateless Cloudflare Worker (worker/worker.mjs). It uses the visitor's key when given,
-   otherwise a demo key held as a Worker secret and restricted to this demo's questions. */
+   a stateless Cloudflare Worker (worker/worker.mjs). It uses a demo key held as a Worker secret and restricted to this demo's questions. */
 const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 const PROXY_URL = LOCAL ? "http://localhost:8787" : "https://jev-router-proxy.etiennelescot.workers.dev";
-const keyInput = $("key");
-try { keyInput.value = sessionStorage.getItem("jev-key") || ""; } catch {}
-keyInput.addEventListener("input", () => {
-  try { sessionStorage.setItem("jev-key", keyInput.value.trim()); } catch {}
-});
 
 async function jev(state, questions){
   const t0 = performance.now();
   const r = await fetch(PROXY_URL, {method:"POST",
-    headers:{"Content-Type":"application/json",
-      ...(keyInput.value.trim() && {"Authorization":"Bearer " + keyInput.value.trim()})},
+    headers:{"Content-Type":"application/json"},
     body: JSON.stringify({state, questions})});
   const text = await r.text();
   let d; try { d = JSON.parse(text); } catch { d = {error: text || ("HTTP " + r.status)}; }
@@ -421,8 +401,7 @@ function cidle(){ con.innerHTML = ""; cline(`<span class="c-p">›</span> waitin
 async function call(n, state, questions){
   cline(`── call ${n}/2 ─────────────────────────────`, "sep");
   cline(`<span class="c-m">POST</span> <span class="c-u">api.typesafe.ai/v1/systemone</span> <span class="c-dim">(via relay)</span>`);
-  const own = keyInput.value.trim();
-  cline(`<span class="c-dim">${own ? `Authorization: Bearer ••••${esc(own.slice(-4))}  (your key, not stored)` : "Authorization: demo key, held by the relay"}</span>`);
+  cline(`<span class="c-dim">Authorization: demo key, held by the relay</span>`);
   cline("", "gap");
   const pending = jev(state, questions).then(r => ({r}), e => ({e}));   // fire now, print while in flight
   await cjson({state, model:"jev-latest", questions});
