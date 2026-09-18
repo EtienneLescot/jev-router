@@ -1,4 +1,4 @@
-# Jev Router
+# Jev Router Demo
 
 Typed judgments in, control flow out. A support ticket goes through two [Jev](https://docs.typesafe.ai) calls, and plain code routes it to an agent, then picks that agent's model tier and reasoning depth. A console next to the pipeline shows the raw requests and responses.
 
