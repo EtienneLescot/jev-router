@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev Router — typed judgments → agent routing</title>
+<style>
+:root{
+  --bg:#070b16;--card:#0f172b;--card2:#0b1222;--well:#090f1d;--line:#1e2a45;--line2:#2a3a5e;
+  --ink:#eaf0fb;--mut:#8593b3;--dim:#56627f;
+  --a1:#4f8cff;--a2:#22d3ee;--good:#34d399;--warn:#fbbf24;--bad:#f87171;--violet:#a78bfa;
+  --c-billing:#34d399;--c-technical:#4f8cff;--c-sales:#fbbf24;--c-escalation:#f87171;
+  --mono:ui-monospace,"Cascadia Code","JetBrains Mono",Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:radial-gradient(900px 480px at 80% -12%,#15234a 0%,transparent 60%),
+             radial-gradient(700px 420px at -10% 105%,#0e2a3a 0%,transparent 55%),var(--bg);
+  min-height:100vh}
+body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.45;
+  background-image:linear-gradient(rgba(79,140,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(79,140,255,.045) 1px,transparent 1px);
+  background-size:44px 44px;mask-image:linear-gradient(#000,transparent 85%)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 20px 60px;position:relative}
+
+/* ===== header ===== */
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;margin-bottom:24px}
+.mini-hex{width:22px;height:22px;background:linear-gradient(135deg,var(--a1),var(--a2));
+  clip-path:polygon(50% 0,93% 25%,93% 75%,50% 100%,7% 75%,7% 25%)}
+.pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:99px;
+  padding:4px 12px;font-size:12px;color:var(--mut);background:rgba(255,255,255,.03)}
+.dot{width:7px;height:7px;border-radius:99px;background:var(--good);box-shadow:0 0 10px var(--good);animation:pulse 2s infinite}
+@keyframes pulse{50%{opacity:.35}}
+h1{margin:12px 0 6px;font-size:40px;line-height:1.1;letter-spacing:-.035em;
+  background:linear-gradient(90deg,#fff 20%,var(--a1) 60%,var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+header p{margin:0;color:var(--mut);max-width:760px}
+header p b{color:var(--ink);font-weight:600}
+
+/* ===== panels ===== */
+.panel{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:18px;
+  padding:20px;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.ph{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:12px;color:var(--mut);font-weight:700;text-transform:uppercase;letter-spacing:.09em}
+.meta{display:flex;gap:6px;flex-wrap:wrap;font-size:12px}
+.meta span{border:1px solid var(--line);border-radius:8px;padding:2px 8px;color:var(--mut);background:var(--well)}
+.meta span b{color:var(--ink);font-weight:600}
+.meta .err{color:var(--bad);border-color:rgba(248,113,113,.4)}
+
+/* ===== input ===== */
+.input{margin-top:18px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:24px}
+.top .brand{margin:0}
+.src{color:var(--mut);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:10px;padding:5px 11px}
+.src:hover{color:var(--ink);border-color:var(--line2)}
+.keyrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.keyrow label{font-size:12px;color:var(--mut);font-weight:600}
+.keyrow input{flex:1;min-width:220px;background:var(--well);border:1px solid var(--line);border-radius:10px;color:var(--ink);
+  font:13px var(--mono);padding:8px 12px}
+.keyrow input:focus{outline:none;border-color:var(--a1);box-shadow:0 0 0 3px rgba(79,140,255,.18)}
+.keyrow input.missing{border-color:var(--bad);box-shadow:0 0 0 3px rgba(248,113,113,.18)}
+.keyrow small{font-size:11.5px;color:var(--dim)}
+.keyrow a{color:var(--a2)}
+textarea{width:100%;min-height:70px;resize:vertical;background:var(--well);border:1px solid var(--line);border-radius:13px;
+  color:var(--ink);font:inherit;padding:12px 14px;margin-top:12px;transition:border-color .15s}
+textarea:focus{outline:none;border-color:var(--a1);box-shadow:0 0 0 3px rgba(79,140,255,.18)}
+.controls{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.presets{display:flex;flex-wrap:wrap;gap:7px}
+.presets button{border:1px solid var(--line);background:rgba(255,255,255,.025);color:var(--mut);border-radius:99px;
+  padding:6px 13px;font:inherit;font-size:12.5px;cursor:pointer;transition:border-color .12s,color .12s,background .12s}
+.presets button:hover{border-color:var(--line2);color:var(--ink)}
+.presets button.on{border-color:var(--a1);color:var(--ink);background:rgba(79,140,255,.1)}
+.go{display:inline-flex;align-items:center;gap:9px;padding:11px 20px;border:none;border-radius:12px;cursor:pointer;
+  font:inherit;font-weight:700;font-size:14px;color:#04101f;background:linear-gradient(90deg,var(--a1),var(--a2));
+  transition:filter .15s,transform .1s;white-space:nowrap}
+.go:hover{filter:brightness(1.1)}
+.go:active{transform:translateY(1px)}
+.go:disabled{opacity:.6;cursor:wait}
+.go kbd{font:600 11px var(--mono);background:rgba(4,16,31,.15);border-radius:5px;padding:1px 5px}
+.spin{width:13px;height:13px;border:2px solid rgba(4,16,31,.3);border-top-color:#04101f;border-radius:99px;animation:rot .7s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+/* ===== stage: pipeline + console ===== */
+.stage{display:grid;grid-template-columns:minmax(0,1fr) 470px;gap:18px;margin-top:18px;align-items:start}
+
+/* steps */
+.steps{list-style:none;margin:16px 0 0;padding:0}
+.step{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr);gap:14px;padding-bottom:18px}
+.step:last-child{padding-bottom:0}
+.step::before{content:"";position:absolute;left:16px;top:34px;bottom:0;width:2px;background:var(--line)}
+.step::after{content:"";position:absolute;left:16px;top:34px;width:2px;height:0;
+  background:linear-gradient(var(--a1),var(--a2));transition:height .6s ease}
+.step.done::after{height:calc(100% - 34px)}
+.step:last-child::before,.step:last-child::after{display:none}
+.num{position:relative;z-index:1;width:34px;height:34px;border-radius:99px;display:grid;place-items:center;
+  font:700 13px var(--mono);color:var(--dim);background:var(--well);border:2px solid var(--line);transition:all .3s}
+.step.running .num{color:var(--ink);border-color:transparent;
+  background:conic-gradient(from var(--ang,0deg),var(--a2),var(--a1) 40%,transparent 60%) border-box;animation:ring 1s linear infinite}
+.step.running .num::before{content:"";position:absolute;inset:2px;border-radius:99px;background:var(--card)}
+.step.running .num span{position:relative}
+@property --ang{syntax:"<angle>";initial-value:0deg;inherits:false}
+@keyframes ring{to{--ang:360deg}}
+.step.done .num{color:#04101f;background:var(--good);border-color:var(--good);box-shadow:0 0 14px rgba(52,211,153,.45)}
+.step.error .num{color:#04101f;background:var(--bad);border-color:var(--bad)}
+.sbody{border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:rgba(255,255,255,.015);
+  opacity:.45;transition:opacity .35s,border-color .35s,box-shadow .35s}
+.step.running .sbody,.step.done .sbody{opacity:1}
+.step.running .sbody{border-color:rgba(79,140,255,.55);box-shadow:0 0 0 3px rgba(79,140,255,.08),0 12px 34px rgba(79,140,255,.12)}
+.shead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.shead h3{margin:0;font-size:14px;font-weight:600}
+.tag{font:600 10.5px var(--mono);letter-spacing:.03em;border-radius:6px;padding:2px 7px;color:var(--mut);border:1px solid var(--line)}
+.tag.jev{color:var(--a2);border-color:rgba(34,211,238,.35);background:rgba(34,211,238,.06)}
+.tag.code{color:var(--violet);border-color:rgba(167,139,250,.35);background:rgba(167,139,250,.06)}
+.sstat{margin-left:auto;font:12px var(--mono);color:var(--dim)}
+.step.done .sstat{color:var(--good)}
+
+/* indicators */
+.ind{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.ind.two{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)}
+.icard{background:var(--well);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.icard h4{margin:0 0 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);font-weight:700}
+.bars{display:flex;flex-direction:column;gap:7px}
+.brow{display:grid;grid-template-columns:70px 1fr 42px;gap:8px;align-items:center;font-size:12px}
+.brow .name{color:var(--mut)} .brow .pct{text-align:right;font-variant-numeric:tabular-nums;color:var(--dim)}
+.brow.lead .name,.brow.lead .pct{color:var(--ink);font-weight:600}
+.track{height:6px;border-radius:99px;background:#121c33;overflow:hidden}
+.fill{height:100%;border-radius:99px;width:0;background:linear-gradient(90deg,var(--a1),var(--a2));transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.brow.lead .fill{background:linear-gradient(90deg,var(--good),var(--a2))}
+.gcard{display:flex;align-items:center;gap:12px}
+.gauge{position:relative;width:64px;height:64px;flex:none}
+.gauge svg{transform:rotate(-90deg);display:block}
+.gauge .ring{transition:stroke-dashoffset .9s cubic-bezier(.2,.8,.2,1),stroke .3s}
+.gauge .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.glabel{font-size:12px;color:var(--mut);line-height:1.4}
+.glabel b{display:block;color:var(--ink);font-weight:600;font-size:13px}
+
+/* agents */
+.agents{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.agent{--c:var(--a1);position:relative;border:1px solid var(--line);border-radius:12px;padding:10px 10px 10px 13px;
+  background:var(--well);overflow:hidden;transition:all .4s cubic-bezier(.2,.8,.2,1)}
+.agent::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c);opacity:.4}
+#a-billing{--c:var(--c-billing)} #a-technical{--c:var(--c-technical)} #a-sales{--c:var(--c-sales)} #a-escalation{--c:var(--c-escalation)}
+.agent .ico{font-size:18px}
+.agent b{display:block;font-size:13px;font-weight:600;margin-top:2px}
+.agent .desc{font-size:11px;color:var(--mut);line-height:1.35}
+.agents.decided .agent{opacity:.3;filter:grayscale(.6)}
+.agents.decided .agent.active{opacity:1;filter:none;border-color:var(--c);transform:translateY(-3px);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--c) 16%,transparent),var(--well) 70%);
+  box-shadow:0 10px 28px color-mix(in srgb,var(--c) 28%,transparent);animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+.agents.decided .agent.active::before{opacity:1}
+@keyframes pop{0%{transform:scale(.96)}60%{transform:scale(1.04) translateY(-3px)}100%{transform:translateY(-3px)}}
+.badge{position:absolute;top:8px;right:8px;font-size:9px;font-weight:800;letter-spacing:.07em;color:#04101f;border-radius:99px;
+  padding:1px 6px;background:var(--c);opacity:0;transition:opacity .3s .2s}
+.agent.active .badge{opacity:1}
+
+/* rules */
+.rules{list-style:none;margin:10px 0 0;padding:0;font:12px/1.5 var(--mono)}
+.rules:empty{display:none}
+.rules li{display:flex;gap:8px;padding:3px 0;color:var(--dim);animation:slidein .35s ease both}
+.rules li.on{color:#b9cdf5}
+.rules li .mk{width:12px;flex:none;text-align:center}
+.rules li.on .mk{color:var(--good);font-weight:800}
+@keyframes slidein{from{opacity:0;transform:translateX(-8px)}}
+
+/* assignment */
+.arow{display:grid;grid-template-columns:78px minmax(0,1fr);gap:10px;align-items:center;margin-bottom:10px}
+.arow > span{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--mut);font-weight:700}
+.seg{position:relative;display:grid;grid-template-columns:repeat(3,1fr);background:var(--well);border:1px solid var(--line);border-radius:11px;padding:3px}
+.seg .opt{position:relative;z-index:1;text-align:center;font:600 12px var(--mono);padding:7px 4px;color:var(--dim);transition:color .3s}
+.seg .opt.on{color:#fff}
+.seg .thumb{position:absolute;top:3px;bottom:3px;left:3px;width:calc((100% - 6px)/3);border-radius:8px;opacity:0;
+  background:linear-gradient(135deg,rgba(167,139,250,.55),rgba(79,140,255,.45));box-shadow:0 0 18px rgba(167,139,250,.35);
+  transition:transform .55s cubic-bezier(.2,1.2,.4,1),opacity .3s}
+.effort{display:flex;flex-direction:column;gap:6px}
+.eaxis{display:flex;justify-content:space-between;align-items:baseline;font-size:11.5px;color:var(--dim)}
+.eaxis b{font-size:13px;color:var(--ink);font-weight:600}
+.etrack{--p:0;position:relative;height:22px;border-radius:99px;background:var(--well);border:1px solid var(--line)}
+.etrack i{position:absolute;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:99px;background:var(--line2)}
+.etrack i:nth-of-type(1){left:14px}.etrack i:nth-of-type(2){left:calc(14px + (100% - 28px)/3)}
+.etrack i:nth-of-type(3){left:calc(14px + (100% - 28px)*2/3)}.etrack i:nth-of-type(4){left:calc(100% - 14px)}
+.efill{position:absolute;left:3px;top:3px;bottom:3px;border-radius:99px;opacity:0;
+  width:calc(22px + (100% - 28px)*var(--p));background:linear-gradient(90deg,rgba(79,140,255,.35),rgba(34,211,238,.55));
+  transition:width .45s cubic-bezier(.2,1.1,.4,1),opacity .3s}
+.eknob{position:absolute;top:50%;left:calc(14px + (100% - 28px)*var(--p));width:16px;height:26px;margin:-13px 0 0 -8px;
+  border-radius:7px;background:#f4f7ff;opacity:.25;box-shadow:0 2px 8px rgba(0,0,0,.5);
+  transition:left .45s cubic-bezier(.2,1.1,.4,1),opacity .3s,box-shadow .3s}
+.etrack.set .efill{opacity:1}
+.etrack.set .eknob{opacity:1;box-shadow:0 2px 8px rgba(0,0,0,.5),0 0 14px rgba(34,211,238,.55)}
+.verdict{margin-top:12px;padding:11px 14px;border-radius:12px;border:1px dashed var(--line);font-size:13px;color:var(--dim)}
+.verdict.set{border-style:solid;border-color:rgba(52,211,153,.45);color:var(--ink);background:rgba(52,211,153,.06);animation:slidein .4s ease both}
+.verdict b{color:#fff}
+
+/* ===== console ===== */
+.console{position:sticky;top:16px;height:min(820px,calc(100vh - 32px));display:flex;flex-direction:column;
+  background:#05080f;border:1px solid #1a2440;border-radius:16px;overflow:hidden;
+  box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 0 1px rgba(79,140,255,.05) inset}
+.cbar{display:flex;align-items:center;gap:7px;padding:10px 14px;background:#0a0f1c;border-bottom:1px solid #151e36;font:12px var(--mono);color:var(--mut)}
+.cbar i{width:11px;height:11px;border-radius:99px;background:#2a3350}
+.cbar i:nth-child(1){background:#ff5f57}.cbar i:nth-child(2){background:#febc2e}.cbar i:nth-child(3){background:#28c840}
+.cbar .ttl{margin-left:8px}
+.cbar .cst{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+.cbar .cst::before{content:"";width:7px;height:7px;border-radius:99px;background:var(--dim)}
+.cbar .cst.live::before{background:var(--a2);box-shadow:0 0 8px var(--a2);animation:pulse 1s infinite}
+.cbar .cst.ok::before{background:var(--good)}
+.cbody{flex:1;overflow:auto;padding:12px 14px 20px;font:11.5px/1.6 var(--mono);color:#9fb0d6;scroll-behavior:smooth}
+.cbody::-webkit-scrollbar{width:8px}.cbody::-webkit-scrollbar-thumb{background:#1a2440;border-radius:8px}
+.cl{white-space:pre-wrap;word-break:break-word;animation:fadein .15s ease both}
+@keyframes fadein{from{opacity:0}}
+.cl.gap{height:10px}
+.cl.sep{margin:12px 0 6px;color:#3b4a70}
+.c-p{color:var(--a2)} .c-m{color:var(--violet);font-weight:700} .c-u{color:#dbe6ff} .c-dim{color:#4c5a7c}
+.c-ok{color:var(--good);font-weight:700} .c-err{color:var(--bad);font-weight:700} .c-cm{color:#5d6d93;font-style:italic}
+.c-k{color:#7aa7ff} .c-s{color:#a5e3a0} .c-n{color:#fbbf77} .c-b{color:#f78fb3}
+.cursor{display:inline-block;width:7px;height:13px;background:var(--a2);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.wait .sp{display:inline-block;animation:rot .8s linear infinite}
+
+footer{margin-top:28px;text-align:center;color:var(--dim);font-size:12px}
+footer a{color:var(--mut)}
+
+@media(max-width:1100px){
+  .stage{grid-template-columns:1fr}
+  .console{position:static;height:460px}
+}
+@media(max-width:640px){
+  h1{font-size:32px}
+  .ind,.ind.two{grid-template-columns:1fr}
+  .agents{grid-template-columns:1fr 1fr}
+  .arow{grid-template-columns:1fr;gap:6px}
+  .seg .opt{font-size:10.5px}
+  .step{grid-template-columns:28px minmax(0,1fr);gap:10px}
+  .num{width:28px;height:28px}
+  .step::before,.step::after{left:13px;top:28px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top"><div class="brand"><span class="mini-hex"></span>Jev Router</div>
+    <a class="src" href="https://github.com/EtienneLescot/jev-router" target="_blank" rel="noopener">View source on GitHub</a></div>
+
+  <header>
+    <span class="pill"><span class="dot"></span> live calls to jev-latest · TypeSafe System One</span>
+    <h1>Jev Router</h1>
+    <p><b>Judgment, then control flow.</b> A first Jev call reads the ticket, and code <b>routes it to an agent</b>.
+      A second call sizes the task, and code gives that agent its <b>LLM</b> and <b>reasoning depth</b>.
+      The console shows every real exchange.</p>
+  </header>
+
+  <section class="panel input">
+    <div class="ph"><h2>Inbound customer message</h2></div>
+    <div class="keyrow">
+      <label for="key">TypeSafe API key</label>
+      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key to run the demo">
+      <small>Kept in this tab only. <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Get a key</a></small>
+    </div>
+    <textarea id="msg" aria-label="Customer message" placeholder="Type a customer message, or pick an example below…"></textarea>
+    <div class="controls">
+      <div class="presets">
+        <button data-m="My card has been declined for 3 days even though I paid my subscription. This is unacceptable, I'm switching to a competitor!!">💳 Payment blocked + angry</button>
+        <button data-m="Hi! How can I upgrade my account to the premium plan? Thanks!">✨ Premium upgrade</button>
+        <button data-m="The app crashes on launch since the last update. There are 300 of us blocked on iPhone.">🚨 App crash</button>
+        <button data-m="We can't reconcile our multi-entity invoices, the API returns inconsistent totals since the schema migration, and our accountant needs the export today.">🧩 Complex billing bug</button>
+      </div>
+      <button class="go" id="go">Route this ticket <kbd>Ctrl ↵</kbd></button>
+    </div>
+  </section>
+
+  <div class="stage">
+    <section class="panel">
+      <div class="ph"><h2>Pipeline</h2><div class="meta" id="meta"></div></div>
+      <ol class="steps">
+        <li class="step" id="s1">
+          <div class="num"><span>1</span></div>
+          <div class="sbody">
+            <div class="shead"><h3>Triage</h3><span class="tag jev">Jev call 1/2</span><span class="sstat" id="st1">pending</span></div>
+            <div class="ind">
+              <div class="icard"><h4>Department</h4><div class="bars" id="b-dept"></div></div>
+              <div class="icard gcard"><div class="gauge" id="g-urg"></div><div class="glabel">Urgency<b id="l-urg">—</b></div></div>
+              <div class="icard gcard"><div class="gauge" id="g-fr"></div><div class="glabel">Mood<b id="l-fr">—</b></div></div>
+            </div>
+          </div>
+        </li>
+        <li class="step" id="s2">
+          <div class="num"><span>2</span></div>
+          <div class="sbody">
+            <div class="shead"><h3>Routing</h3><span class="tag code">policy in code</span><span class="sstat" id="st2">pending</span></div>
+            <div class="agents" id="agents">
+              <div class="agent" id="a-billing"><span class="badge">ROUTED</span><span class="ico">💳</span><b>Billing</b><div class="desc">payments · refunds · subscriptions</div></div>
+              <div class="agent" id="a-technical"><span class="badge">ROUTED</span><span class="ico">🛠️</span><b>Technical</b><div class="desc">bugs · outages · integrations</div></div>
+              <div class="agent" id="a-sales"><span class="badge">ROUTED</span><span class="ico">📈</span><b>Sales</b><div class="desc">pricing · upgrades · pre-sales</div></div>
+              <div class="agent" id="a-escalation"><span class="badge">ROUTED</span><span class="ico">🧑‍✈️</span><b>Human</b><div class="desc">high stakes · at-risk customer</div></div>
+            </div>
+            <ul class="rules" id="r-route"></ul>
+          </div>
+        </li>
+        <li class="step" id="s3">
+          <div class="num"><span>3</span></div>
+          <div class="sbody">
+            <div class="shead"><h3>Task sizing</h3><span class="tag jev">Jev call 2/2</span><span class="sstat" id="st3">pending</span></div>
+            <div class="ind two">
+              <div class="icard"><h4>Complexity</h4><div class="bars" id="b-cx"></div></div>
+              <div class="icard gcard"><div class="gauge" id="g-stk"></div><div class="glabel">Stakes<b id="l-stk">—</b></div></div>
+            </div>
+          </div>
+        </li>
+        <li class="step" id="s4">
+          <div class="num"><span>4</span></div>
+          <div class="sbody">
+            <div class="shead"><h3>Agent setup</h3><span class="tag code">policy in code</span><span class="sstat" id="st4">pending</span></div>
+            <div class="arow"><span>Model</span>
+              <div class="seg" id="seg"><div class="thumb" id="thumb"></div>
+                <div class="opt" data-k="fast-8b">⚡ fast-8b</div><div class="opt" data-k="balanced-70b">◈ balanced-70b</div><div class="opt" data-k="frontier-1200">🧠 frontier-1200</div></div>
+            </div>
+            <div class="arow"><span>Reasoning</span>
+              <div class="effort"><div class="eaxis"><span>Faster</span><b id="think-l">—</b><span>Smarter</span></div>
+                <div class="etrack" id="think"><div class="efill"></div><i></i><i></i><i></i><i></i><div class="eknob"></div></div></div>
+            </div>
+            <ul class="rules" id="r-size"></ul>
+            <div class="verdict" id="verdict">Waiting for a ticket…</div>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <aside class="console" aria-label="Live exchange with Jev">
+      <div class="cbar"><i></i><i></i><i></i><span class="ttl">jev · live exchange</span><span class="cst" id="cst">idle</span></div>
+      <div class="cbody" id="con"></div>
+    </aside>
+  </div>
+
+  <footer>Open source · deterministic policy in JS, judgments by <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Jev (TypeSafe System One)</a> · your key goes through a <a href="https://github.com/EtienneLescot/jev-router/blob/main/worker/worker.mjs" target="_blank" rel="noopener">stateless relay</a> and is never stored · judgments unedited</footer>
+</div>
+
+<script>
+/* ---------- the two Jev calls ---------- */
+const TRIAGE = {
+  department: {type:"choice", instructions:"Which team should handle this customer message?",
+    criteria:{billing:"Payments, charges, refunds, subscriptions",
+              technical:"Bugs, outages, integrations, performance",
+              sales:"Pricing, upgrades, new accounts, pre-sales questions"}},
+  urgent: {type:"noul", instructions:"Does this message express real urgency (degraded service, blocking issue, collective impact)?",
+    criteria:{true:"Customer blocked, service unusable or multiple users affected — needs immediate handling",
+              false:"Ordinary question or request with no urgent character"}},
+  frustration: {type:"score", instructions:"How frustrated is the customer?",
+    criteria:["Calm or good-humored customer","Annoyed customer, firm tone","Very angry customer, threatening to leave"]}
+};
+const SIZING = {
+  complexity: {type:"choice", instructions:"How complex is this request for the assigned agent to resolve?",
+    criteria:{simple:"Single-step, well-defined ask",
+              standard:"Multi-step but standard procedure",
+              complex:"Cross-system investigation, edge case, ambiguous situation"}},
+  stakes: {type:"noul", instructions:"Would a wrong or careless answer have serious consequences (money lost, churn, legal or data risk)?",
+    criteria:{true:"Serious consequences if the answer is wrong",
+              false:"Low-risk, easily corrected if wrong"}}
+};
+const AGENT_NAME = {billing:"Billing agent", technical:"Technical agent", sales:"Sales agent", escalation:"Human escalation"};
+const THINK = ["low","medium","high","deep"];
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* The Jev API refuses browser calls from other origins (CORS), so requests go through
+   a stateless Cloudflare Worker (worker/worker.mjs) that forwards them with the visitor's key. */
+const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
+const PROXY_URL = LOCAL ? "http://localhost:8787" : "https://jev-router-proxy.etiennelescot.workers.dev";
+const keyInput = $("key");
+try { keyInput.value = sessionStorage.getItem("jev-key") || ""; } catch {}
+keyInput.addEventListener("input", () => {
+  keyInput.classList.remove("missing");
+  try { sessionStorage.setItem("jev-key", keyInput.value.trim()); } catch {}
+});
+
+async function jev(state, questions){
+  const t0 = performance.now();
+  const r = await fetch(PROXY_URL, {method:"POST",
+    headers:{"Content-Type":"application/json", "Authorization":"Bearer " + keyInput.value.trim()},
+    body: JSON.stringify({state, questions})});
+  const text = await r.text();
+  let d; try { d = JSON.parse(text); } catch { d = {error: text || ("HTTP " + r.status)}; }
+  if(!r.ok){
+    const e = d.error ?? d.detail ?? d;
+    throw new Error(`${r.status} · ${typeof e === "string" ? e : e?.message || "request failed"}`);
+  }
+  return {...d, ms: Math.round(performance.now() - t0), status: r.status};
+}
+
+/* ---------- deterministic policy: code owns the control flow ---------- */
+function route(a){
+  const dept = a.department.choice, urg = a.urgent.noul, fr = a.frustration.score, rules = [];
+  let agent = dept;
+  rules.push({t:`department = ${dept} → ${dept} agent`, on:true});
+  if (urg >= 0.75 && fr >= 1.8){
+    agent = "escalation";
+    rules.push({t:`urgency ${Math.round(urg*100)}% ≥ 75% and frustration ${fr.toFixed(1)} ≥ 1.8 → human escalation`, on:true});
+  } else {
+    rules.push({t:`escalation guard not met (urgency ${Math.round(urg*100)}%, frustration ${fr.toFixed(1)}/2)`, on:false});
+  }
+  return {agent, rules};
+}
+function size(a, agent, urg){
+  const cx = a.complexity.choice, stk = a.stakes.noul, rules = [];
+  const base = {simple:["fast-8b",1], standard:["balanced-70b",2], complex:["frontier-1200",3]}[cx];
+  let [llm, think] = base;
+  rules.push({t:`complexity = ${cx} → ${llm}, ${THINK[think-1]} reasoning`, on:true});
+  if (stk >= 0.6 && think < 4){ think++; rules.push({t:`stakes ${Math.round(stk*100)}% ≥ 60% → reasoning +1 (${THINK[think-1]})`, on:true}); }
+  else rules.push({t:`stakes ${Math.round(stk*100)}% < 60% → reasoning unchanged`, on:false});
+  if (agent === "escalation" && llm !== "frontier-1200"){
+    llm = "frontier-1200"; think = Math.max(think, 3);
+    rules.push({t:"human escalation → frontier model drafts the reply for the human", on:true});
+  } else if (urg > 0.5 && llm === "fast-8b"){
+    llm = "balanced-70b";
+    rules.push({t:`urgency ${Math.round(urg*100)}% > 50% → upgrade fast-8b to balanced-70b`, on:true});
+  }
+  return {llm, think, rules};
+}
+
+/* ---------- console ---------- */
+const con = $("con");
+const esc = s => s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function cline(html, cls=""){
+  const d = document.createElement("div");
+  d.className = "cl " + cls; d.innerHTML = html;
+  con.appendChild(d); con.scrollTop = con.scrollHeight;
+  return d;
+}
+function hl(line){
+  return esc(line).replace(/("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g,
+    (m, s, colon, b) => s ? `<span class="${colon?"c-k":"c-s"}">${s}</span>${colon||""}` :
+                         b ? `<span class="c-b">${m}</span>` : `<span class="c-n">${m}</span>`);
+}
+async function cjson(obj){
+  const lines = JSON.stringify(obj, null, 2).split("\n");
+  for (let i = 0; i < lines.length; i++){
+    cline(hl(lines[i]));
+    if (i % 2) await sleep(12);
+  }
+}
+function cstat(text, cls=""){ const s = $("cst"); s.textContent = text; s.className = "cst " + cls; }
+function cidle(){ con.innerHTML = ""; cline(`<span class="c-p">›</span> waiting for a ticket <span class="cursor"></span>`); cstat("idle"); }
+
+async function call(n, state, questions){
+  cline(`── call ${n}/2 ─────────────────────────────`, "sep");
+  cline(`<span class="c-m">POST</span> <span class="c-u">api.typesafe.ai/v1/systemone</span> <span class="c-dim">(via relay)</span>`);
+  cline(`<span class="c-dim">Authorization: Bearer ••••${esc(keyInput.value.trim().slice(-4))}  (your key, not stored)</span>`);
+  cline("", "gap");
+  const pending = jev(state, questions).then(r => ({r}), e => ({e}));   // fire now, print while in flight
+  await cjson({state, model:"jev-latest", questions});
+  const w = cline(`<span class="c-dim"><span class="sp">◐</span> awaiting Jev…</span>`, "wait");
+  const {r, e} = await pending;
+  w.remove();
+  if (e){ cline(`<span class="c-err">✗ ${esc(e.message)}</span>`); throw e; }
+  cline("", "gap");
+  cline(`<span class="c-ok">← ${r.status} OK</span> <span class="c-dim">· ${r.ms} ms · ${r.usage.input_tokens + r.usage.output_tokens} tokens</span>`);
+  await cjson({model:r.model, answers:r.answers, usage:r.usage});
+  return r;
+}
+async function crules(ul, rules){
+  cline("", "gap");
+  for (const r of rules){
+    cline(`<span class="c-cm">// ${esc(r.t)}</span>`);
+    const li = document.createElement("li"); li.className = r.on ? "on" : "";
+    li.innerHTML = `<span class="mk">${r.on?"✓":"·"}</span><span>${esc(r.t)}</span>`;
+    ul.appendChild(li);
+    await sleep(380);
+  }
+}
+
+/* ---------- widgets ---------- */
+const C = 2*Math.PI*26;
+function gaugeHTML(){
+  return `<svg width="64" height="64"><circle cx="32" cy="32" r="26" fill="none" stroke="#121c33" stroke-width="7"/>
+    <circle class="ring" cx="32" cy="32" r="26" fill="none" stroke="var(--line2)" stroke-width="7" stroke-linecap="round"
+      stroke-dasharray="${C}" stroke-dashoffset="${C}"/></svg><div class="val">—</div>`;
+}
+function setGauge(id, ratio, text){
+  const g = $(id), col = ratio>.6 ? "var(--bad)" : ratio>.3 ? "var(--warn)" : "var(--good)";
+  const ring = g.querySelector(".ring");
+  ring.style.stroke = col; ring.style.strokeDashoffset = C*(1-ratio);
+  g.querySelector(".val").textContent = text;
+}
+function barsHTML(keys){
+  return keys.map(k => `<div class="brow" data-k="${k}"><span class="name">${k}</span><div class="track"><div class="fill"></div></div><span class="pct">—</span></div>`).join("");
+}
+function setBars(id, probs){
+  const max = Math.max(...Object.values(probs));
+  $(id).querySelectorAll(".brow").forEach(row => {
+    const p = probs[row.dataset.k] ?? 0;
+    row.classList.toggle("lead", p === max);
+    row.querySelector(".fill").style.width = (p*100) + "%";
+    row.querySelector(".pct").textContent = (p*100).toFixed(p>=.995||p<.005 ? 0 : 1) + "%";
+  });
+}
+function setStep(n, state, text){
+  const s = $("s"+n); s.classList.remove("running","done","error");
+  if (state) s.classList.add(state);
+  $("st"+n).textContent = text;
+  if (state === "running" && innerWidth <= 1100) s.scrollIntoView({block:"nearest", behavior:"smooth"});
+}
+
+function reset(){
+  [1,2,3,4].forEach(n => setStep(n, "", "pending"));
+  $("b-dept").innerHTML = barsHTML(Object.keys(TRIAGE.department.criteria));
+  $("b-cx").innerHTML = barsHTML(Object.keys(SIZING.complexity.criteria));
+  ["g-urg","g-fr","g-stk"].forEach(id => $(id).innerHTML = gaugeHTML());
+  ["l-urg","l-fr","l-stk"].forEach(id => $(id).textContent = "—");
+  $("agents").classList.remove("decided");
+  document.querySelectorAll(".agent").forEach(a => a.classList.remove("active"));
+  $("r-route").innerHTML = $("r-size").innerHTML = "";
+  $("thumb").style.opacity = 0;
+  document.querySelectorAll(".seg .opt").forEach(o => o.classList.remove("on"));
+  $("think").classList.remove("set"); $("think").style.setProperty("--p", 0); $("think-l").textContent = "—";
+  $("verdict").className = "verdict"; $("verdict").textContent = "Waiting for a ticket…";
+  $("meta").innerHTML = "";
+}
+
+/* ---------- the run, step by step ---------- */
+async function run(){
+  const btn = $("go"), msg = $("msg").value.trim();
+  if (!msg || btn.disabled) return;
+  if (!keyInput.value.trim()){
+    keyInput.classList.add("missing"); keyInput.focus();
+    $("meta").innerHTML = `<span class="err">Add your TypeSafe API key first</span>`;
+    return;
+  }
+  document.querySelectorAll(".presets button").forEach(x => x.classList.toggle("on", x.dataset.m === msg));
+  btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Routing…';
+  reset(); con.innerHTML = "";
+  $("verdict").textContent = "Pipeline running…";
+  cline(`<span class="c-p">›</span> <span class="c-u">new ticket</span> <span class="c-dim">(${msg.length} chars)</span>`);
+  let totalMs = 0, tokens = 0, step = 1;
+  try{
+    // 1 — triage
+    cstat("call 1/2", "live"); setStep(1, "running", "calling Jev…");
+    const r1 = await call(1, {customer_message: msg}, TRIAGE);
+    totalMs += r1.ms; tokens += r1.usage.input_tokens + r1.usage.output_tokens;
+    const a1 = r1.answers, urg = a1.urgent.noul, fr = a1.frustration.score;
+    setBars("b-dept", a1.department.probabilities);
+    setGauge("g-urg", urg, Math.round(urg*100) + "%");
+    $("l-urg").textContent = urg>.6 ? "urgent" : urg>.3 ? "moderate" : "not urgent";
+    setGauge("g-fr", fr/2, fr.toFixed(1));
+    $("l-fr").textContent = fr>=1.8 ? "😡 very angry" : fr>=0.8 ? "😒 annoyed" : "🙂 calm";
+    await sleep(900);
+    setStep(1, "done", `${r1.ms} ms`);
+
+    // 2 — routing
+    step = 2; cstat("routing", "live"); setStep(2, "running", "applying policy…");
+    const R = route(a1);
+    await crules($("r-route"), R.rules);
+    $("a-"+R.agent).classList.add("active"); $("agents").classList.add("decided");
+    cline(`<span class="c-p">›</span> routed to <span class="c-u">${AGENT_NAME[R.agent]}</span>`);
+    await sleep(800);
+    setStep(2, "done", "→ " + AGENT_NAME[R.agent]);
+
+    // 3 — sizing, with the routing decision in the state
+    step = 3; cstat("call 2/2", "live"); setStep(3, "running", "calling Jev…");
+    const r2 = await call(2, {customer_message: msg, assigned_agent: AGENT_NAME[R.agent]}, SIZING);
+    totalMs += r2.ms; tokens += r2.usage.input_tokens + r2.usage.output_tokens;
+    const a2 = r2.answers, stk = a2.stakes.noul;
+    setBars("b-cx", a2.complexity.probabilities);
+    setGauge("g-stk", stk, Math.round(stk*100) + "%");
+    $("l-stk").textContent = stk>.6 ? "high risk" : stk>.3 ? "some risk" : "low risk";
+    await sleep(900);
+    setStep(3, "done", `${r2.ms} ms`);
+
+    // 4 — agent setup
+    step = 4; cstat("setup", "live"); setStep(4, "running", "applying policy…");
+    const S = size(a2, R.agent, urg);
+    await crules($("r-size"), S.rules);
+    const opts = [...document.querySelectorAll(".seg .opt")], idx = opts.findIndex(o => o.dataset.k === S.llm);
+    $("thumb").style.transform = `translateX(${idx*100}%)`; $("thumb").style.opacity = 1;
+    opts.forEach((o,i) => o.classList.toggle("on", i === idx));
+    await sleep(450);
+    $("think").classList.add("set");
+    for (let i = 0; i < S.think; i++){
+      $("think").style.setProperty("--p", i/3); $("think-l").textContent = THINK[i];
+      await sleep(320);
+    }
+    await sleep(200);
+    $("verdict").className = "verdict set";
+    $("verdict").innerHTML = `<b>${AGENT_NAME[R.agent]}</b> takes the ticket on <b>${S.llm}</b> with <b>${THINK[S.think-1]}</b> reasoning.`;
+    cline(`<span class="c-p">›</span> <span class="c-ok">done</span> <span class="c-u">${AGENT_NAME[R.agent]} · ${S.llm} · ${THINK[S.think-1]} reasoning</span>`);
+    cline(`<span class="c-dim">  2 Jev calls · ${totalMs} ms · ${tokens} tokens</span>`);
+    cline(`<span class="c-p">›</span> <span class="cursor"></span>`);
+    setStep(4, "done", "ready");
+    cstat("done", "ok");
+    $("meta").innerHTML = `<span><b>${r2.model}</b></span><span><b>2</b> calls</span><span><b>${totalMs}</b> ms</span><span><b>${tokens}</b> tokens</span>`;
+  }catch(e){
+    setStep(step, "error", "failed");
+    cstat("error");
+    $("meta").innerHTML = `<span class="err">Failed: ${esc(e.message)}</span>`;
+    $("verdict").textContent = "Pipeline stopped.";
+  }
+  btn.disabled = false; btn.innerHTML = 'Route this ticket <kbd>Ctrl ↵</kbd>';
+}
+
+document.querySelectorAll(".presets button").forEach(b => b.onclick = () => { $("msg").value = b.dataset.m; run(); });
+$("msg").addEventListener("input", () => document.querySelectorAll(".presets button").forEach(x => x.classList.remove("on")));
+$("msg").addEventListener("keydown", e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") run(); });
+$("go").onclick = run;
+reset(); cidle();
+</script>
+</body>
+</html>
