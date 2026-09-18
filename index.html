@@ -56,7 +56,7 @@ header p b{color:var(--ink);font-weight:600}
 .keyrow input{flex:1;min-width:220px;background:var(--well);border:1px solid var(--line);border-radius:10px;color:var(--ink);
   font:13px var(--mono);padding:8px 12px}
 .keyrow input:focus{outline:none;border-color:var(--a1);box-shadow:0 0 0 3px rgba(79,140,255,.18)}
-.keyrow input.missing{border-color:var(--bad);box-shadow:0 0 0 3px rgba(248,113,113,.18)}
+.keyrow .opt{color:var(--dim);font-weight:400}
 .keyrow small{font-size:11.5px;color:var(--dim)}
 .keyrow a{color:var(--a2)}
 textarea{width:100%;min-height:70px;resize:vertical;background:var(--well);border:1px solid var(--line);border-radius:13px;
@@ -249,11 +249,11 @@ footer a{color:var(--mut)}
   <section class="panel input">
     <div class="ph"><h2>Inbound customer message</h2></div>
     <div class="keyrow">
-      <label for="key">TypeSafe API key</label>
-      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key to run the demo">
+      <label for="key">Your own API key <span class="opt">(optional)</span></label>
+      <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Leave empty to use the demo key">
       <small>Kept in this tab only. <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Get a key</a></small>
     </div>
-    <textarea id="msg" aria-label="Customer message" placeholder="Type a customer message, or pick an example below…"></textarea>
+    <textarea id="msg" maxlength="1000" aria-label="Customer message" placeholder="Type a customer message, or pick an example below…"></textarea>
     <div class="controls">
       <div class="presets">
         <button data-m="My card has been declined for 3 days even though I paid my subscription. This is unacceptable, I'm switching to a competitor!!">💳 Payment blocked + angry</button>
@@ -328,51 +328,32 @@ footer a{color:var(--mut)}
     </aside>
   </div>
 
-  <footer>Open source · deterministic policy in JS, judgments by <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Jev (TypeSafe System One)</a> · your key goes through a <a href="https://github.com/EtienneLescot/jev-router/blob/main/worker/worker.mjs" target="_blank" rel="noopener">stateless relay</a> and is never stored · judgments unedited</footer>
+  <footer>Open source · deterministic policy in JS, judgments by <a href="https://docs.typesafe.ai" target="_blank" rel="noopener">Jev (TypeSafe System One)</a> · calls go through a <a href="https://github.com/EtienneLescot/jev-router/blob/main/worker/worker.mjs" target="_blank" rel="noopener">stateless relay</a> that stores nothing · judgments unedited</footer>
 </div>
 
-<script>
-/* ---------- the two Jev calls ---------- */
-const TRIAGE = {
-  department: {type:"choice", instructions:"Which team should handle this customer message?",
-    criteria:{billing:"Payments, charges, refunds, subscriptions",
-              technical:"Bugs, outages, integrations, performance",
-              sales:"Pricing, upgrades, new accounts, pre-sales questions"}},
-  urgent: {type:"noul", instructions:"Does this message express real urgency (degraded service, blocking issue, collective impact)?",
-    criteria:{true:"Customer blocked, service unusable or multiple users affected — needs immediate handling",
-              false:"Ordinary question or request with no urgent character"}},
-  frustration: {type:"score", instructions:"How frustrated is the customer?",
-    criteria:["Calm or good-humored customer","Annoyed customer, firm tone","Very angry customer, threatening to leave"]}
-};
-const SIZING = {
-  complexity: {type:"choice", instructions:"How complex is this request for the assigned agent to resolve?",
-    criteria:{simple:"Single-step, well-defined ask",
-              standard:"Multi-step but standard procedure",
-              complex:"Cross-system investigation, edge case, ambiguous situation"}},
-  stakes: {type:"noul", instructions:"Would a wrong or careless answer have serious consequences (money lost, churn, legal or data risk)?",
-    criteria:{true:"Serious consequences if the answer is wrong",
-              false:"Low-risk, easily corrected if wrong"}}
-};
-const AGENT_NAME = {billing:"Billing agent", technical:"Technical agent", sales:"Sales agent", escalation:"Human escalation"};
+<script type="module">
+import { TRIAGE, SIZING, AGENT_NAME, MAX_MESSAGE } from "./questions.js";
+
 const THINK = ["low","medium","high","deep"];
 const $ = id => document.getElementById(id);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* The Jev API refuses browser calls from other origins (CORS), so requests go through
-   a stateless Cloudflare Worker (worker/worker.mjs) that forwards them with the visitor's key. */
+   a stateless Cloudflare Worker (worker/worker.mjs). It uses the visitor's key when given,
+   otherwise a demo key held as a Worker secret and restricted to this demo's questions. */
 const LOCAL = ["localhost", "127.0.0.1"].includes(location.hostname);
 const PROXY_URL = LOCAL ? "http://localhost:8787" : "https://jev-router-proxy.etiennelescot.workers.dev";
 const keyInput = $("key");
 try { keyInput.value = sessionStorage.getItem("jev-key") || ""; } catch {}
 keyInput.addEventListener("input", () => {
-  keyInput.classList.remove("missing");
   try { sessionStorage.setItem("jev-key", keyInput.value.trim()); } catch {}
 });
 
 async function jev(state, questions){
   const t0 = performance.now();
   const r = await fetch(PROXY_URL, {method:"POST",
-    headers:{"Content-Type":"application/json", "Authorization":"Bearer " + keyInput.value.trim()},
+    headers:{"Content-Type":"application/json",
+      ...(keyInput.value.trim() && {"Authorization":"Bearer " + keyInput.value.trim()})},
     body: JSON.stringify({state, questions})});
   const text = await r.text();
   let d; try { d = JSON.parse(text); } catch { d = {error: text || ("HTTP " + r.status)}; }
@@ -440,7 +421,8 @@ function cidle(){ con.innerHTML = ""; cline(`<span class="c-p">›</span> waitin
 async function call(n, state, questions){
   cline(`── call ${n}/2 ─────────────────────────────`, "sep");
   cline(`<span class="c-m">POST</span> <span class="c-u">api.typesafe.ai/v1/systemone</span> <span class="c-dim">(via relay)</span>`);
-  cline(`<span class="c-dim">Authorization: Bearer ••••${esc(keyInput.value.trim().slice(-4))}  (your key, not stored)</span>`);
+  const own = keyInput.value.trim();
+  cline(`<span class="c-dim">${own ? `Authorization: Bearer ••••${esc(own.slice(-4))}  (your key, not stored)` : "Authorization: demo key, held by the relay"}</span>`);
   cline("", "gap");
   const pending = jev(state, questions).then(r => ({r}), e => ({e}));   // fire now, print while in flight
   await cjson({state, model:"jev-latest", questions});
@@ -516,11 +498,7 @@ function reset(){
 async function run(){
   const btn = $("go"), msg = $("msg").value.trim();
   if (!msg || btn.disabled) return;
-  if (!keyInput.value.trim()){
-    keyInput.classList.add("missing"); keyInput.focus();
-    $("meta").innerHTML = `<span class="err">Add your TypeSafe API key first</span>`;
-    return;
-  }
+  if (msg.length > MAX_MESSAGE) return;
   document.querySelectorAll(".presets button").forEach(x => x.classList.toggle("on", x.dataset.m === msg));
   btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Routing…';
   reset(); con.innerHTML = "";

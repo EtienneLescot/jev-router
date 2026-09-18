@@ -2,3 +2,9 @@ name = "jev-router-proxy"
 main = "worker.mjs"
 compatibility_date = "2026-09-01"
 workers_dev = true
+
+# Per-IP limit on the demo key: 20 calls per minute, i.e. about 10 demo runs.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }

@@ -4,7 +4,7 @@ Typed judgments in, control flow out. A support ticket goes through two [Jev](ht
 
 ![Jev Router](screenshot.png)
 
-**Try it: https://etiennelescot.github.io/jev-router/** (bring your own TypeSafe API key)
+**Try it: https://etiennelescot.github.io/jev-router/** (no key needed)
 
 ## How it works
 
@@ -15,11 +15,12 @@ Typed judgments in, control flow out. A support ticket goes through two [Jev](ht
 
 The model tiers (`fast-8b`, `balanced-70b`, `frontier-1200`) are illustrative labels. The demo does not call them.
 
-## Your API key
+## API keys
 
-The Jev API does not accept browser calls from other origins (CORS), so the page posts to a Cloudflare Worker, [`worker/worker.mjs`](worker/worker.mjs), which forwards the call to `api.typesafe.ai`. The Worker code stores and logs nothing. The page keeps the key in `sessionStorage`, for the current tab only.
+The Jev API does not accept browser calls from other origins (CORS), so the page posts to a Cloudflare Worker, [`worker/worker.mjs`](worker/worker.mjs), which forwards the call to `api.typesafe.ai`. The Worker code stores and logs nothing.
 
-Rather not send your key through someone else's relay? Run it locally or deploy your own Worker.
+- **Demo key:** held as a Worker secret, never sent to the browser. It only runs this demo's two question sets ([`questions.js`](questions.js)) on a ticket of up to 1,000 characters, with a per-IP limit of 20 calls a minute.
+- **Your own key (optional):** paste it in the page to use your own quota. The page keeps it in `sessionStorage` for the current tab, and the relay forwards any valid request with it.
 
 ## Run locally
 
@@ -33,12 +34,13 @@ Then, from the repo root, in another terminal:
 python -m http.server 8000
 ```
 
-Open http://localhost:8000. On localhost the page calls the relay at `http://localhost:8787`.
+Open http://localhost:8000. On localhost the page calls the relay at `http://localhost:8787`. Paste your key in the page, or put `TYPESAFE_API_KEY=...` in `worker/.dev.vars` to act as the demo key.
 
 ## Deploy your own
 
 ```bash
 cd worker && npx wrangler deploy
+npx wrangler secret put TYPESAFE_API_KEY   # optional: demo key for visitors without one
 ```
 
 Then set `PROXY_URL` in `index.html` to your Worker URL, and `ALLOWED_ORIGIN` in `worker/worker.mjs` to the origin serving the page.
