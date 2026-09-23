@@ -9,7 +9,7 @@ import { TRIAGE, SIZING, AGENT_NAME, MAX_MESSAGE } from "../questions.js";
 
 const UPSTREAM = "https://api.typesafe.ai/v1/systemone";
 const MODEL = "jev-latest";
-const ALLOWED_ORIGIN = "https://etiennelescot.github.io";
+const ALLOWED_ORIGINS = ["https://etiennelescot.github.io", "https://jevmigration.com"];
 const LOCAL_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 const MAX_BODY = 32 * 1024;
 const DEMO_QUESTIONS = [TRIAGE, SIZING].map(q => JSON.stringify(q));
@@ -25,9 +25,9 @@ const isDemoState = s =>
 export default {
   async fetch(request, env = {}) {
     const origin = request.headers.get("Origin") || "";
-    const allowed = origin === ALLOWED_ORIGIN || LOCAL_ORIGIN.test(origin);
+    const allowed = ALLOWED_ORIGINS.includes(origin) || LOCAL_ORIGIN.test(origin);
     const cors = {
-      "Access-Control-Allow-Origin": allowed ? origin : ALLOWED_ORIGIN,
+      "Access-Control-Allow-Origin": allowed ? origin : ALLOWED_ORIGINS[0],
       "Access-Control-Allow-Methods": "POST, OPTIONS",
       "Access-Control-Allow-Headers": "Authorization, Content-Type",
       "Vary": "Origin",

@@ -24,6 +24,12 @@ async function capture(fn) {
   try { return { res: await fn(), sent }; } finally { globalThis.fetch = realFetch; }
 }
 
+test("preflight allows jevmigration.com", async () => {
+  const r = await call({ method: "OPTIONS" }, "https://jevmigration.com");
+  assert.equal(r.status, 204);
+  assert.equal(r.headers.get("Access-Control-Allow-Origin"), "https://jevmigration.com");
+});
+
 test("preflight allows the demo page", async () => {
   const r = await call({ method: "OPTIONS" });
   assert.equal(r.status, 204);

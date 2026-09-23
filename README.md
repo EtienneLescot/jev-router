@@ -42,7 +42,7 @@ cd worker && npx wrangler deploy
 npx wrangler secret put TYPESAFE_API_KEY   # optional: demo key for visitors without one
 ```
 
-Then set `PROXY_URL` in `index.html` to your Worker URL, and `ALLOWED_ORIGIN` in `worker/worker.mjs` to the origin serving the page.
+Then set `PROXY_URL` in `index.html` to your Worker URL, and add the origin serving the page to `ALLOWED_ORIGINS` in `worker/worker.mjs`.
 
 ## Test
 
